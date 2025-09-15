@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Users Status List</title>
+  <style>
+    /* အဲ့ထဲက CSS အကုန်ထည့်ထားတယ် */
+    /* ... အတိုချုံး ... */
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 Servers List: Online Users</h1>
+    <div class="refresh-info">🖥️ လူသုံးနည်းတဲ့ဆာဗာတွေရွေးချယ်ပြီးသုံးပါ</div>
+
+    <table id="serverTable">
+      <tr>
+        <th>Server Status</th>
+        <th>Server Name</th>
+        <th>Online Users</th>
+        <th>Ping</th>
+      </tr>
+    </table>
+
+    <div class="total-users" id="totalUsers">Total Online Active: <span class="online-count">0</span> Users</div>
+    <div class="last-updated" id="lastUpdated"></div>
+    <div class="copyright">© 2023 Server Status Monitor. All rights reserved.</div>
+  </div>
+
+  <button class="theme-toggle" id="themeToggle">🌙</button>
+
+  <script>
+    const servers = {
+      'th-01': 'http://45.136.255.72:81/server/online',
+      'th-02': 'http://212.80.215.220:81/server/online',
+      'th-03': 'http://45.136.255.108:81/server/online',
+      'th-04': 'http://43.229.150.11:8888/server/online',
+      'th-05': 'http://45.136.255.108:81/server/online'
+    };
+
+    function getCountryCode(name) {
+      return name.split('-')[0] || '';
+    }
+
+    function getFlagImage(code) {
+      return `<img src="https://flagcdn.com/w40/${code}.png" class="flag" onerror="this.style.display='none'">`;
+    }
+
+    function getPingClass(ping) {
+      if (ping <= 100) return 'ping-good';
+      if (ping <= 300) return 'ping-medium';
+      return 'ping-bad';
+    }
+
+    async function fetchServerStatus(name, url) {
+      const flag = getFlagImage(getCountryCode(name));
+      let onlineCount = 0;
+      let status = "Offline";
+      let statusClass = "status-offline";
+      let pingTime = 0;
+      let pingClass = "";
+
+      const start = performance.now();
+      try {
+        const response = await fetch(url, { method: "GET" });
+        pingTime = Math.round(performance.now() - start);
+        if (response.ok) {
+          const text = await response.text();
+          onlineCount = parseInt(text) || 0;
+          status = "Online";
+          statusClass = "status-online";
+          pingClass = getPingClass(pingTime);
+        }
+      } catch (e) {
+        pingTime = Math.round(performance.now() - start);
+      }
+
+      return {
+        name,
+        flag,
+        onlineCount,
+        status,
+        statusClass,
+        pingTime,
+        pingClass
+      };
+    }
+
+    async function updateTable() {
+      const table = document.getElementById("serverTable");
+      // clear old rows except header
+      table.querySelectorAll("tr:not(:first-child)").forEach(r => r.remove());
+
+      let totalUsers = 0;
+
+      for (const [name, url] of Object.entries(servers)) {
+        const server = await fetchServerStatus(name, url);
+        totalUsers += server.onlineCount;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><span class="status-indicator ${server.statusClass}"></span>${server.status}</td>
+          <td class="server-name">${server.flag}<span>${name.toUpperCase()}</span></td>
+          <td>${server.onlineCount > 0 ? `Active : <span class="online-count">${server.onlineCount}</span> Users` : '<span class="error-message">Unable to connect</span>'}</td>
+          <td><span class="ping-time ${server.pingClass}">${server.pingTime} ms</span></td>
+        `;
+        table.appendChild(row);
+      }
+
+      document.getElementById("totalUsers").innerHTML =
+        `Total Online Active: <span class="online-count">${totalUsers}</span> Users`;
+
+      document.getElementById("lastUpdated").textContent =
+        "Last updated: " + new Date().toLocaleString("en-GB", { timeZone: "Asia/Bangkok" });
+    }
+
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    const body = document.body;
+
+    function updateToggleButton() {
+      themeToggle.textContent = body.classList.contains('dark-mode') ? '☀️' : '🌙';
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      body.classList.toggle('dark-mode', savedTheme === 'dark');
+      updateToggleButton();
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      body.classList.toggle('dark-mode', prefersDark);
+      localStorage.setItem('theme', prefersDark ? 'dark' : 'light');
+      updateToggleButton();
+    }
+
+    themeToggle.addEventListener('click', () => {
+      body.classList.toggle('dark-mode');
+      const isDark = body.classList.contains('dark-mode');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateToggleButton();
+    });
+
+    // First load
+    updateTable();
+    // Refresh every 20 sec
+    setInterval(updateTable, 20000);
+  </script>
+</body>
+</html>
